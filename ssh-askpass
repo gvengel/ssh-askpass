@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+
+if [ "$1" == '--prompt' ]; then
+    exec 3>"$2"
+    shift 2
+    whiptail "$@" 2>&3
+    echo >&3
+    echo "$?" >&3
+    exit 0
+fi
+
+if [ -f ~/.ssh/ssh-agent.timeout ]; then
+    if [ $(<~/.ssh/ssh-agent.timeout) -gt $(date +%s) ]; then
+        exit 0
+    fi
+fi
+
+TIMEOUT=30
+DEFAULT=5
+TERM="iTerm2"
+TITLE=$"SSH Agent Request"}
+PROMPT="$1\n\nConfirm for agent for time interval."
+INPUTOPTS="10 0 $DEFAULT"
+TMP="$(mktemp -dt ask)"
+FIFO="$TMP/fifo"
+EXIT=1
+function cleanup { rm -fr "$TMP"; }
+trap cleanup EXIT
+
+tmux list-sessions > /dev/null
+if [ "$?" == "0" ]; then
+    mkfifo -m 0600 "$FIFO" || exit 1
+    tmux new-window -n askpass "'$0' --prompt '$FIFO' --inputbox '$PROMPT' $INPUTOPTS" 2> /dev/null
+    if [ "$?" == "0" ]; then
+        read -t $TIMEOUT -rd '' GRACE REPLY < "$FIFO" || tmux kill-window -t askpass
+        if [ "$REPLY" == "0" ]; then
+            EXIT=0
+        fi
+    fi
+else
+    GRACE=`osascript - <<EOT
+tell application "$TERM"
+    set prompt to display dialog "$PROMPT" buttons {"Ok", "Cancel"} default button 1 default answer $DEFAULT with title "$TITLE" with icon caution giving up after $TIMEOUT
+end tell
+set answer to button returned of prompt
+if answer is not equal to "Ok" then
+    return -1
+end if
+set grace to text returned of prompt as integer
+return grace
+EOT`
+    echo $GRACE > /tmp/out
+    if [ "$GRACE" -ne "-1" ]; then
+        EXIT=0
+    fi
+fi
+if [ "$GRACE" -gt 0 ]; then
+    date "-v+${GRACE}S" "+%s" > ~/.ssh/ssh-agent.timeout   
+fi
+
+exit $EXIT
