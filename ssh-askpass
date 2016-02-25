@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+# Handle callback from tmux
 if [ "$1" == '--prompt' ]; then
     exec 3>"$2"
     shift 2
@@ -9,18 +10,22 @@ if [ "$1" == '--prompt' ]; then
     exit 0
 fi
 
+TIMEOUT=10
+DEFAULT=10
+TERM="iTerm"
+TITLE="SSH Agent Request"
+PROMPT="$1\n\nConfirm for agent for time interval."
+KEYFILE=$(echo "$1" | awk '/^Allow use of key/ {print $5}' | cut -d? -f1)
+INPUTOPTS="10 0 $DEFAULT"
+
+# Approve requests in grace period.
 if [ -f ~/.ssh/ssh-agent.timeout ]; then
     if [ $(<~/.ssh/ssh-agent.timeout) -gt $(date +%s) ]; then
+        terminal-notifier -title "$TITLE" -message "Approved use of ${KEYFILE:-agent}."
         exit 0
     fi
 fi
 
-TIMEOUT=30
-DEFAULT=5
-TERM="iTerm2"
-TITLE="SSH Agent Request"
-PROMPT="$1\n\nConfirm for agent for time interval."
-INPUTOPTS="10 0 $DEFAULT"
 TMP="$(mktemp -dt ask)"
 FIFO="$TMP/fifo"
 EXIT=1
@@ -49,7 +54,6 @@ end if
 set grace to text returned of prompt as integer
 return grace
 EOT`
-    echo $GRACE > /tmp/out
     if [ "$GRACE" -ne "-1" ]; then
         EXIT=0
     fi
@@ -57,5 +61,7 @@ fi
 if [ "$GRACE" -gt 0 ]; then
     date "-v+${GRACE}S" "+%s" > ~/.ssh/ssh-agent.timeout   
 fi
-
+if [ "$EXIT" -ne "0" ]; then
+    terminal-notifier -title "$TITLE" -message "Denied use of ${KEYFILE:-agent}."
+fi
 exit $EXIT
