@@ -22,5 +22,8 @@ _.bash_profile_
         [ "$?" == "1" ] && ssh-add -c -t 12h
     }
     connect_ssh_agent
-   
-    
+
+Author
+======
+
+Gabe Van Engel <gabe@schizoid.net>
