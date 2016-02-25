@@ -18,7 +18,7 @@ fi
 TIMEOUT=30
 DEFAULT=5
 TERM="iTerm2"
-TITLE=$"SSH Agent Request"}
+TITLE="SSH Agent Request"
 PROMPT="$1\n\nConfirm for agent for time interval."
 INPUTOPTS="10 0 $DEFAULT"
 TMP="$(mktemp -dt ask)"
