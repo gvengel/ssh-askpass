@@ -32,7 +32,7 @@ EXIT=1
 function cleanup { rm -fr "$TMP"; }
 trap cleanup EXIT
 
-tmux list-sessions > /dev/null
+tmux list-sessions | grep attached > /dev/null
 if [ "$?" == "0" ]; then
     mkfifo -m 0600 "$FIFO" || exit 1
     tmux new-window -n askpass "'$0' --prompt '$FIFO' --inputbox '$PROMPT' $INPUTOPTS" 2> /dev/null
