@@ -10,7 +10,7 @@ if [ "$1" == '--prompt' ]; then
     exit 0
 fi
 
-TIMEOUT=10
+TIMEOUT=60
 DEFAULT=10
 TERM="iTerm"
 TITLE="SSH Agent Request"
@@ -26,14 +26,32 @@ if [ -f ~/.ssh/ssh-agent.timeout ]; then
     fi
 fi
 
-TMP="$(mktemp -dt ask)"
-FIFO="$TMP/fifo"
-EXIT=1
-function cleanup { rm -fr "$TMP"; }
-trap cleanup EXIT
+[ -e ~/.ssh/ssh-agent.info ] && . ~/.ssh/ssh-agent.info
+PIDS="$(for d in $(lsof "$SSH_AUTH_SOCK" | awk '/ssh-agent/ {print $6}'); do lsof -c ssh | awk "/>$d/ {print \$2}"; done)"
+echo "$PIDS" > /tmp/out
+# Check for PIDS with multiple pipes, this is a request through a forwarded agent
+CALLER=$(echo "$PIDS" | sort | uniq -d | tail -1)
+if [ -z "$CALLER" ]; then
+    # Otherwise, just get the most recent SSH process
+    CALLER=$(ps -o etime,pid -p $PIDS | sed 's/://g' | sort -n | head -2 | tail -1 | awk '{print $2}')
+fi
 
-tmux list-sessions | grep attached > /dev/null
-if [ "$?" == "0" ]; then
+ppid() { echo $((ps -o ppid,comm -p "$1" || echo "") | tail -1); }
+PARENT=$(ppid $CALLER)
+while [ "$PARENT" ]; do 
+    PARENT=$(ppid $PARENT)
+    if [[ "$PARENT" == *'tmux'* ]]; then
+        break
+    fi
+done
+
+EXIT=1
+
+if [ "$PARENT" ]; then
+    TMP="$(mktemp -dt ask)"
+    FIFO="$TMP/fifo"
+    function cleanup { rm -fr "$TMP"; }
+    trap cleanup EXIT
     mkfifo -m 0600 "$FIFO" || exit 1
     tmux new-window -n askpass "'$0' --prompt '$FIFO' --inputbox '$PROMPT' $INPUTOPTS" 2> /dev/null
     if [ "$?" == "0" ]; then
