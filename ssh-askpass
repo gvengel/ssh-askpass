@@ -28,7 +28,6 @@ fi
 
 [ -e ~/.ssh/ssh-agent.info ] && . ~/.ssh/ssh-agent.info
 PIDS="$(for d in $(lsof "$SSH_AUTH_SOCK" | awk '/ssh-agent/ {print $6}'); do lsof -c ssh | awk "/>$d/ {print \$2}"; done)"
-echo "$PIDS" > /tmp/out
 # Check for PIDS with multiple pipes, this is a request through a forwarded agent
 CALLER=$(echo "$PIDS" | sort | uniq -d | tail -1)
 if [ -z "$CALLER" ]; then
