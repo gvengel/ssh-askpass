@@ -60,7 +60,9 @@ if [ "$PARENT" ]; then
         fi
     fi
 else
-    GRACE=`osascript - <<EOT
+    # If we connected via SSH, the dialog is going to timeout, so fail early
+    if [ -z "$SSH_CONNECTION" ]; then
+        GRACE=`osascript - <<EOT
 tell application "$TERM"
     set prompt to display dialog "$PROMPT" buttons {"Ok", "Cancel"} default button 1 default answer $DEFAULT with title "$TITLE" with icon caution giving up after $TIMEOUT
 end tell
@@ -71,8 +73,9 @@ end if
 set grace to text returned of prompt as integer
 return grace
 EOT`
-    if [ "$GRACE" -ne "-1" ]; then
-        EXIT=0
+        if [ "$GRACE" -ne "-1" ]; then
+            EXIT=0
+        fi
     fi
 fi
 if [ "$GRACE" -gt 0 ]; then
