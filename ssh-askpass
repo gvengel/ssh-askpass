@@ -28,24 +28,27 @@ fi
 
 [ -e ~/.ssh/ssh-agent.info ] && . ~/.ssh/ssh-agent.info
 PIDS="$(for d in $(lsof "$SSH_AUTH_SOCK" | awk '/ssh-agent/ {print $6}'); do lsof -c ssh | awk "/>$d/ {print \$2}"; done)"
-# Check for PIDS with multiple pipes, this is a request through a forwarded agent
-CALLER=$(echo "$PIDS" | sort | uniq -d | tail -1)
-if [ -z "$CALLER" ]; then
-    # Otherwise, just get the most recent SSH process
-    CALLER=$(ps -o etime,pid -p $PIDS | sed 's/://g' | sort -n | head -2 | tail -1 | awk '{print $2}')
-fi
-
-ppid() { echo $((ps -o ppid,comm -p "$1" || echo "") | tail -1); }
-PARENT=$(ppid $CALLER)
-while [ "$PARENT" ]; do 
-    PARENT=$(ppid $PARENT)
-    if [[ "$PARENT" == *'tmux'* ]]; then
-        break
+if [ "$PIDS" ]; then
+    # Check for PIDS with multiple pipes, which are requests through a forwarded agent
+    CALLER=$(echo "$PIDS" | sort | uniq -d | tail -1)
+    if [ -z "$CALLER" ]; then
+        # Otherwise, just get the most recent SSH process
+        CALLER=$(ps -o etime,pid -p $PIDS | sed 's/://g' | sort -n | head -2 | tail -1 | awk '{print $2}')
     fi
-done
+    # Search a parent tmux process
+    ppid() { echo $((ps -o ppid,comm -p "$1" || echo "") | tail -1); }
+    PARENT=$(ppid $CALLER)
+    while [ "$PARENT" ]; do 
+        PARENT=$(ppid $PARENT)
+        if [[ "$PARENT" == *'tmux'* ]]; then
+            break
+        fi
+    done
+fi
 
 EXIT=1
 
+# We were called from inside a tmux session, so prompt via a new tmux window.
 if [ "$PARENT" ]; then
     TMP="$(mktemp -dt ask)"
     FIFO="$TMP/fifo"
@@ -59,6 +62,7 @@ if [ "$PARENT" ]; then
             EXIT=0
         fi
     fi
+# Otherwise, we pop a GUI prompt
 else
     # If we connected via SSH, the dialog is going to timeout, so fail early
     if [ -z "$SSH_CONNECTION" ]; then
