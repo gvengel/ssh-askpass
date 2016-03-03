@@ -17,11 +17,18 @@ TITLE="SSH Agent Request"
 PROMPT="$1\n\nConfirm for agent for time interval."
 KEYFILE=$(echo "$1" | awk '/^Allow use of key/ {print $5}' | cut -d? -f1)
 INPUTOPTS="10 0 $DEFAULT"
+REMOTE=""
+
+notify() {
+    if [ -x "$(which terminal-notifier)" -a -z "$REMOTE"]; then
+        terminal-notifier -title "$TITLE" -message "$*"
+    fi
+}
 
 # Approve requests in grace period.
 if [ -f ~/.ssh/ssh-agent.timeout ]; then
     if [ $(<~/.ssh/ssh-agent.timeout) -gt $(date +%s) ]; then
-        terminal-notifier -title "$TITLE" -message "Approved use of ${KEYFILE:-agent}."
+        notify "Approved use of ${KEYFILE:-agent}."
         exit 0
     fi
 fi
@@ -40,12 +47,16 @@ if [ "$PIDS" ]; then
     PARENT=$(ppid $CALLER)
     while [ "$PARENT" ]; do 
         PARENT=$(ppid $PARENT)
+        if [[ "$PARENT" == *'sshd'* ]]; then
+            REMOTE="$PARENT"
+        fi
         if [[ "$PARENT" == *'tmux'* ]]; then
             break
         fi
     done
 fi
 
+GRACE=0
 EXIT=1
 
 # We were called from inside a tmux session, so prompt via a new tmux window.
@@ -65,7 +76,7 @@ if [ "$PARENT" ]; then
 # Otherwise, we pop a GUI prompt
 else
     # If we connected via SSH, the dialog is going to timeout, so fail early
-    if [ -z "$SSH_CONNECTION" ]; then
+    if [ -z "$REMOTE" ]; then
         GRACE=`osascript - <<EOT
 tell application "$TERM"
     set prompt to display dialog "$PROMPT" buttons {"Ok", "Cancel"} default button 1 default answer $DEFAULT with title "$TITLE" with icon caution giving up after $TIMEOUT
@@ -86,6 +97,6 @@ if [ "$GRACE" -gt 0 ]; then
     date "-v+${GRACE}S" "+%s" > ~/.ssh/ssh-agent.timeout   
 fi
 if [ "$EXIT" -ne "0" ]; then
-    terminal-notifier -title "$TITLE" -message "Denied use of ${KEYFILE:-agent}."
+    notify "Denied use of ${KEYFILE:-agent}."
 fi
 exit $EXIT
