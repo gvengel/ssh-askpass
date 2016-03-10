@@ -20,7 +20,7 @@ INPUTOPTS="10 0 $DEFAULT"
 REMOTE=""
 
 notify() {
-    if [ -x "$(which terminal-notifier)" -a -z "$REMOTE"]; then
+    if [ -x "$(which terminal-notifier)" -a -z "$REMOTE" ]; then
         terminal-notifier -title "$TITLE" -message "$*"
     fi
 }
@@ -34,7 +34,7 @@ if [ -f ~/.ssh/ssh-agent.timeout ]; then
 fi
 
 [ -e ~/.ssh/ssh-agent.info ] && . ~/.ssh/ssh-agent.info
-PIDS="$(for d in $(lsof "$SSH_AGENT_PID" | awk '$5 == "unix" {print $6}'); do lsof -c ssh | awk "/>$d/ {print \$2}"; done)"
+PIDS="$(for d in $(lsof -p "$SSH_AGENT_PID" | awk '$5 == "unix" {print $6}'); do lsof -c ssh | awk "/>$d/ {print \$2}"; done)"
 if [ "$PIDS" ]; then
     # Check for PIDS with multiple pipes, which are requests through a forwarded agent
     CALLER=$(echo "$PIDS" | sort | uniq -d | tail -1)
@@ -79,6 +79,7 @@ else
     if [ -z "$REMOTE" ]; then
         GRACE=`osascript - <<EOT
 tell application "$TERM"
+    activate
     set prompt to display dialog "$PROMPT" buttons {"Ok", "Cancel"} default button 1 default answer $DEFAULT with title "$TITLE" with icon caution giving up after $TIMEOUT
 end tell
 set answer to button returned of prompt
