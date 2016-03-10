@@ -40,7 +40,7 @@ if [ "$PIDS" ]; then
     CALLER=$(echo "$PIDS" | sort | uniq -d | tail -1)
     if [ -z "$CALLER" ]; then
         # Otherwise, just get the most recent SSH process
-        CALLER=$(ps -o etime,pid -p $PIDS | sed 's/://g' | sort -n | head -2 | tail -1 | awk '{print $2}')
+        CALLER=$(ps -o etime,pid -p $PIDS | tail -n+2 | sed 's/://g' | sort -n | head -1 | awk '{print $2}')
     fi
     # Search a parent tmux process
     ppid() { echo $((ps -o ppid,comm -p "$1" || echo "") | tail -1); }
