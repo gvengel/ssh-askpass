@@ -72,6 +72,8 @@ if [ "$PARENT" ]; then
         if [ "$REPLY" == "0" ]; then
             EXIT=0
         fi
+        GRACE="$(sed 's/[^0-9]//g')"
+        GRACE="${GRACE:-$DEFAULT}"
     fi
 # Otherwise, we pop a GUI prompt
 else
@@ -86,7 +88,11 @@ set answer to button returned of prompt
 if answer is not equal to "Ok" then
     return -1
 end if
-set grace to text returned of prompt as integer
+try
+    set grace to text returned of prompt as integer
+on error
+    set grace to $DEFAULT
+end try
 return grace
 EOT`
         if [ "$GRACE" -ne "-1" ]; then
