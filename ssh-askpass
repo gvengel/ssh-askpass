@@ -20,8 +20,8 @@ INPUTOPTS="10 0 $DEFAULT"
 REMOTE=""
 
 notify() {
-    if [ -x "$(which terminal-notifier)" -a -z "$REMOTE" ]; then
-        terminal-notifier -title "$TITLE" -message "$*"
+    if [ -x "$(which osascript)" -a -z "$REMOTE" ]; then
+        osascript -e "display notification \"$*\" with title \"$TITLE\""
     fi
 }
 
@@ -66,6 +66,7 @@ if [ "$PARENT" ]; then
     function cleanup { rm -fr "$TMP"; }
     trap cleanup EXIT
     mkfifo -m 0600 "$FIFO" || exit 1
+    which whiptail || exit 1
     tmux new-window -n askpass "'$0' --prompt '$FIFO' --inputbox '$PROMPT' $INPUTOPTS" 2> /dev/null
     if [ "$?" == "0" ]; then
         read -t $TIMEOUT -rd '' GRACE REPLY < "$FIFO" || tmux kill-window -t askpass

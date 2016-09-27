@@ -1,15 +1,13 @@
 Installation
 ============
 
-Copy or link the ssh-askpass script to /usr/local/bin. Install newt, terminal-notifier, and reattach-to-user-namespace packages.
+Copy or link the ssh-askpass script to /usr/local/bin. 
 
-    brew update && brew install newt terminal-notifier reattach-to-user-namespace
+Install newt, so we can use whiptail CLI prompts.
 
-Enable reattach-to-user-namespace in your .tmux.conf.
+    brew update && brew install newt
 
-    set -g default-command "which reattach-to-user-namespace > /dev/null && reattach-to-user-namespace -l $SHELL || $SHELL -l"
-    
-Make sure your shell is running it's own ssh-agent. This prevents problems with rootless mode. Note the ssh-add at the end, and adjust accordingly.
+Make sure your shell is running its own ssh-agent. This prevents problems with rootless mode. Note the ssh-add at the end, and adjust accordingly.
 
 _.bash_profile_
 
