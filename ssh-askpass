@@ -69,7 +69,7 @@ if [ "$PARENT" ]; then
     which -s whiptail || exit 1
     tmux new-window -n askpass "'$0' --prompt '$FIFO' --inputbox '$PROMPT' $INPUTOPTS" 2> /dev/null
     if [ "$?" == "0" ]; then
-        read -t $TIMEOUT -rd '' GRACE REPLY < "$FIFO" || tmux kill-window -t askpass
+        builtin read -t $TIMEOUT -rd '' GRACE REPLY < "$FIFO" || tmux kill-window -t askpass
         if [ "$REPLY" == "0" ]; then
             EXIT=0
         fi
