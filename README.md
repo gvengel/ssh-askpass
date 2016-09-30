@@ -3,27 +3,22 @@ Installation
 
 Copy or link the ssh-askpass script to /usr/local/bin. 
 
-Install newt, so we can use whiptail CLI prompts.
+Install newt, so we can use whiptail CLI prompts. (Example uses [Homebrew](http://brew.sh/) for installation)
 
     brew update && brew install newt
 
-Make sure your shell is running its own ssh-agent. This prevents problems with rootless mode. Note the ssh-add at the end, and adjust accordingly.
+By default, macOS looks for ssh-askpass in /usr/libexec; however, this location is protected by rootless mode. Add the following to your .bash_profile, which redirects ssh-agent to look in /usr/local/bin. Note the call to ssh-add, if you wish to adjust the timeout.
 
 _.bash_profile_
 
     # Setup our SSH agent
-    export DISPLAY=:0
-    export SSH_ASKPASS=/usr/local/bin/ssh-askpass
-
     connect_ssh_agent() {
-        echo "$SSH_AUTH_SOCK" | grep com.apple.launchd > /dev/null && unset SSH_AUTH_SOCK && launchctl unload /System/Library/LaunchAgents/org.openbsd.ssh-agent.plist 2> /dev/null
-        [ -e ~/.ssh/ssh-agent.info ] && . ~/.ssh/ssh-agent.info
         ssh-add -l > /dev/null 2>&1
-        [ "$?" == "2" ] && ssh-agent -s | grep -v echo > ~/.ssh/ssh-agent.info && . ~/.ssh/ssh-agent.info
-        ssh-add -l > /dev/null 2>&1
-        [ "$?" == "1" ] && ssh-add -c -t 12h
+        if [ "$?" != "0" ]; then
+            launchctl setenv SSH_ASKPASS /usr/local/bin/ssh-askpass DISPLAY :0 && launchctl stop com.openssh.ssh-agent
+            ssh-add -c -t 12h
+        fi
     }
-
     connect_ssh_agent
 
 Author

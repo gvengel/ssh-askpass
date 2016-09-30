@@ -33,8 +33,7 @@ if [ -f ~/.ssh/ssh-agent.timeout ]; then
     fi
 fi
 
-[ -e ~/.ssh/ssh-agent.info ] && . ~/.ssh/ssh-agent.info
-PIDS="$(for d in $(lsof -p "$SSH_AGENT_PID" | awk '$5 == "unix" {print $6}'); do lsof -c ssh | awk "/>$d/ {print \$2}"; done)"
+PIDS="$(for d in $(lsof -p "$PPID" | awk '$5 == "unix" {print $6}'); do lsof -c ssh | awk "/>$d/ {print \$2}"; done)"
 if [ "$PIDS" ]; then
     # Check for PIDS with multiple pipes, which are requests through a forwarded agent
     CALLER=$(echo "$PIDS" | sort | uniq -d | tail -1)
