@@ -19,6 +19,8 @@ KEYFILE=$(echo "$1" | awk '/^Allow use of key/ {print $5}' | cut -d? -f1)
 INPUTOPTS="10 0 $DEFAULT"
 REMOTE=""
 
+export PATH="/usr/local/bin:$PATH"
+
 notify() {
     if [ -x "$(which -s osascript)" -a -z "$REMOTE" ]; then
         osascript -e "display notification \"$*\" with title \"$TITLE\""
@@ -66,7 +68,7 @@ if [ "$PARENT" ]; then
     trap cleanup EXIT
     mkfifo -m 0600 "$FIFO" || exit 1
     which -s whiptail || exit 1
-    tmux new-window -n askpass "'$0' --prompt '$FIFO' --inputbox '$PROMPT' $INPUTOPTS" 2> /dev/null
+    tmux new-window -n askpass "'$0' --prompt '$FIFO' --inputbox '$PROMPT' $INPUTOPTS" > /dev/null 2>&1
     if [ "$?" == "0" ]; then
         builtin read -t $TIMEOUT -rd '' GRACE REPLY < "$FIFO" || tmux kill-window -t askpass
         if [ "$REPLY" == "0" ]; then
