@@ -74,7 +74,7 @@ if [ "$PARENT" ]; then
         if [ "$REPLY" == "0" ]; then
             EXIT=0
         fi
-        GRACE="$(sed 's/[^0-9]//g')"
+        GRACE="${GRACE//[^0-9]}"
         GRACE="${GRACE:-$DEFAULT}"
     fi
 # Otherwise, we pop a GUI prompt
