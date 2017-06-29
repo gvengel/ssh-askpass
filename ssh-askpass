@@ -102,10 +102,9 @@ EOT`
         fi
     fi
 fi
-if [ "$GRACE" -gt 0 ]; then
-    date "-v+${GRACE}S" "+%s" > ~/.ssh/ssh-agent.timeout   
-fi
 if [ "$EXIT" -ne "0" ]; then
     notify "Denied use of ${KEYFILE:-agent}."
+elif [ "$GRACE" -gt 0 ]; then
+    date "-v+${GRACE}S" "+%s" > ~/.ssh/ssh-agent.timeout   
 fi
 exit $EXIT
