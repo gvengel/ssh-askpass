@@ -2,12 +2,12 @@
 
 # Handle callback from tmux
 if [ "$1" == '--prompt' ]; then
-    exec 3>"$2"
-    shift 2
-    whiptail "$@" 2>&3
-    echo >&3
-    echo "$?" >&3
-    exit 0
+  exec 3>"$2"
+  shift 2
+  whiptail "$@" 2>&3
+  echo >&3
+  echo "$?" >&3
+  exit 0
 fi
 
 TIMEOUT=5
@@ -22,45 +22,45 @@ REMOTE=""
 export PATH="/usr/local/bin:$PATH"
 
 notify() {
-    if [ -x "$(which osascript)" -a -z "$REMOTE" ]; then
-        osascript -e "display notification \"$*\" with title \"$TITLE\""
-    fi
+  if [ -x "$(which osascript)" ] && [ -z "$REMOTE" ]; then
+    osascript -e "display notification \"$*\" with title \"$TITLE\""
+  fi
 }
 
 # Approve requests in grace period.
 if [ -f ~/.ssh/ssh-agent.timeout ]; then
-    if [ $(<~/.ssh/ssh-agent.timeout) -gt $(date +%s) ]; then
-        notify "Approved use of ${KEYFILE:-agent}."
-        exit 0
-    fi
+  if [ "$(<~/.ssh/ssh-agent.timeout)" -gt "$(date +%s)" ]; then
+    notify "Approved use of ${KEYFILE:-agent}."
+    exit 0
+  fi
 fi
 
 if [ "$(uname -s)" == "Darwin" ]; then
-	OPENED=$(lsof -c ssh)
-	PIDS="$(for d in $(lsof -p "$PPID" | awk '$5 == "unix" {print $6}'); do echo "$OPENED" | awk "/>$d/ {print \$2}"; done)"
-	if [ "$PIDS" ]; then
-		# Check for PIDS with multiple pipes, which are requests through a forwarded agent
-		CALLER=$(echo "$PIDS" | sort | uniq -d | tail -1)
-		if [ -z "$CALLER" ]; then
-			# Otherwise, just get the most recent SSH process
-			CALLER=$(ps -o etime,pid -p $PIDS | tail -n+2 | sed 's/://g' | sort -n | head -1 | awk '{print $2}')
-		fi
-		# Search a parent tmux process
-		ppid() { echo $((ps -o ppid,comm -p "$1" || echo "") | tail -1); }
-		PARENT=$(ppid $CALLER)
-		while [ "$PARENT" ]; do 
-			PARENT=$(ppid $PARENT)
-			if [[ "$PARENT" == *'sshd'* ]]; then
-				REMOTE="$PARENT"
-			fi
-			if [[ "$PARENT" == *'tmux'* ]]; then
-				break
-			fi
-		done
-	fi
+  OPENED=$(lsof -c ssh)
+  PIDS="$(for d in $(lsof -p "$PPID" | awk '$5 == "unix" {print $6}'); do echo "$OPENED" | awk "/>$d/ {print \$2}"; done)"
+  if [ "$PIDS" ]; then
+    # Check for PIDs with multiple pipes, which are requests through a forwarded agent
+    CALLER=$(echo "$PIDS" | sort | uniq -d | tail -1)
+    if [ -z "$CALLER" ]; then
+      # Otherwise, just get the most recent SSH process
+      CALLER=$(ps -o etime,pid -p "$PIDS" | tail -n+2 | sed 's/://g' | sort -n | head -1 | awk '{print $2}')
+    fi
+    # Search a parent tmux process
+    ppid() { (ps -o ppid,comm -p "$1" || echo "") | tail -1; }
+    PARENT=$(ppid "$CALLER")
+    while [ "$PARENT" ]; do
+      PARENT=$(ppid "$PARENT")
+      if [[ "$PARENT" == *'sshd'* ]]; then
+        REMOTE="$PARENT"
+      fi
+      if [[ "$PARENT" == *'tmux'* ]]; then
+        break
+      fi
+    done
+  fi
 else
-    # Assume we are under tmux on other platforms
-	PARENT="tmux"
+  # Assume we are under tmux on other platforms
+  PARENT="tmux"
 fi
 
 GRACE=0
@@ -68,26 +68,26 @@ EXIT=1
 
 # We were called from inside a tmux session, so prompt via a new tmux window.
 if [ "$PARENT" ]; then
-    TMP="$(mktemp -dt ask.XXXXXXXX)"
-    FIFO="$TMP/fifo"
-    function cleanup { rm -fr "$TMP"; }
-    trap cleanup EXIT
-    mkfifo -m 0600 "$FIFO" || exit 1
-    which whiptail >/dev/null || exit 1
-    tmux new-window -n askpass "'$0' --prompt '$FIFO' --inputbox '$PROMPT' $INPUTOPTS" > /dev/null 2>&1
-    if [ "$?" == "0" ]; then
-        builtin read -t $TIMEOUT -rd '' GRACE REPLY < "$FIFO" || tmux kill-window -t askpass
-        if [ "$REPLY" == "0" ]; then
-            EXIT=0
-        fi
-        GRACE="${GRACE//[^0-9]}"
-        GRACE="${GRACE:-$DEFAULT}"
+  TMP="$(mktemp -dt ask.XXXXXXXX)"
+  FIFO="$TMP/fifo"
+  function cleanup() { rm -fr "$TMP"; }
+  trap cleanup EXIT
+  mkfifo -m 0600 "$FIFO" || exit 1
+  which whiptail >/dev/null || exit 1
+  if tmux new-window -n askpass "'$0' --prompt '$FIFO' --inputbox '$PROMPT' $INPUTOPTS" >/dev/null 2>&1; then
+    builtin read -t $TIMEOUT -rd '' GRACE REPLY <"$FIFO" || tmux kill-window -t askpass
+    if [ "$REPLY" == "0" ]; then
+      EXIT=0
     fi
+    GRACE="${GRACE//[^0-9]/}"
+    GRACE="${GRACE:-$DEFAULT}"
+  fi
 # Otherwise, we pop a GUI prompt
 else
-    # If we connected via SSH, the dialog is going to timeout, so fail early
-    if [ -z "$REMOTE" ]; then
-        GRACE=`osascript - <<EOT
+  # If we connected via SSH, the dialog is going to timeout, so fail early
+  if [ -z "$REMOTE" ]; then
+    GRACE=$(
+      osascript - <<EOT
 tell application "$TERM"
     activate
     set prompt to display dialog "$PROMPT" buttons {"Ok", "Cancel"} default button 1 default answer $DEFAULT with title "$TITLE" with icon caution giving up after $TIMEOUT
@@ -102,15 +102,16 @@ on error
     set grace to $DEFAULT
 end try
 return grace
-EOT`
-        if [ "$GRACE" -ne "-1" ]; then
-            EXIT=0
-        fi
+EOT
+    )
+    if [ "$GRACE" -ne "-1" ]; then
+      EXIT=0
     fi
+  fi
 fi
 if [ "$EXIT" -ne "0" ]; then
-    notify "Denied use of ${KEYFILE:-agent}."
+  notify "Denied use of ${KEYFILE:-agent}."
 elif [ "$GRACE" -gt 0 ]; then
-    echo $(($(date +%s) + ${GRACE})) > ~/.ssh/ssh-agent.timeout   
+  echo $(($(date +%s) + GRACE)) >~/.ssh/ssh-agent.timeout
 fi
 exit $EXIT

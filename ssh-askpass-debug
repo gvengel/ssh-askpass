@@ -1,3 +1,4 @@
 #!/bin/sh
 
-bash -x "$(cd "$( dirname "$0" )" && pwd)"/ssh-askpass "$*" > /tmp/debug.log 2>&1; exit $?
+bash -x "$(cd "$(dirname "$0")" && pwd)"/ssh-askpass "$*" >/tmp/debug.log 2>&1
+exit $?
