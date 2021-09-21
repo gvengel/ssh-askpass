@@ -22,7 +22,7 @@ REMOTE=""
 export PATH="/usr/local/bin:$PATH"
 
 notify() {
-    if [ -x "$(which -s osascript)" -a -z "$REMOTE" ]; then
+    if [ -x "$(which osascript)" -a -z "$REMOTE" ]; then
         osascript -e "display notification \"$*\" with title \"$TITLE\""
     fi
 }
@@ -35,27 +35,32 @@ if [ -f ~/.ssh/ssh-agent.timeout ]; then
     fi
 fi
 
-OPENED=$(lsof -c ssh)
-PIDS="$(for d in $(lsof -p "$PPID" | awk '$5 == "unix" {print $6}'); do echo "$OPENED" | awk "/>$d/ {print \$2}"; done)"
-if [ "$PIDS" ]; then
-    # Check for PIDS with multiple pipes, which are requests through a forwarded agent
-    CALLER=$(echo "$PIDS" | sort | uniq -d | tail -1)
-    if [ -z "$CALLER" ]; then
-        # Otherwise, just get the most recent SSH process
-        CALLER=$(ps -o etime,pid -p $PIDS | tail -n+2 | sed 's/://g' | sort -n | head -1 | awk '{print $2}')
-    fi
-    # Search a parent tmux process
-    ppid() { echo $((ps -o ppid,comm -p "$1" || echo "") | tail -1); }
-    PARENT=$(ppid $CALLER)
-    while [ "$PARENT" ]; do 
-        PARENT=$(ppid $PARENT)
-        if [[ "$PARENT" == *'sshd'* ]]; then
-            REMOTE="$PARENT"
-        fi
-        if [[ "$PARENT" == *'tmux'* ]]; then
-            break
-        fi
-    done
+if [ "$(uname -s)" == "Darwin" ]; then
+	OPENED=$(lsof -c ssh)
+	PIDS="$(for d in $(lsof -p "$PPID" | awk '$5 == "unix" {print $6}'); do echo "$OPENED" | awk "/>$d/ {print \$2}"; done)"
+	if [ "$PIDS" ]; then
+		# Check for PIDS with multiple pipes, which are requests through a forwarded agent
+		CALLER=$(echo "$PIDS" | sort | uniq -d | tail -1)
+		if [ -z "$CALLER" ]; then
+			# Otherwise, just get the most recent SSH process
+			CALLER=$(ps -o etime,pid -p $PIDS | tail -n+2 | sed 's/://g' | sort -n | head -1 | awk '{print $2}')
+		fi
+		# Search a parent tmux process
+		ppid() { echo $((ps -o ppid,comm -p "$1" || echo "") | tail -1); }
+		PARENT=$(ppid $CALLER)
+		while [ "$PARENT" ]; do 
+			PARENT=$(ppid $PARENT)
+			if [[ "$PARENT" == *'sshd'* ]]; then
+				REMOTE="$PARENT"
+			fi
+			if [[ "$PARENT" == *'tmux'* ]]; then
+				break
+			fi
+		done
+	fi
+else
+    # Assume we are under tmux on other platforms
+	PARENT="tmux"
 fi
 
 GRACE=0
@@ -63,12 +68,12 @@ EXIT=1
 
 # We were called from inside a tmux session, so prompt via a new tmux window.
 if [ "$PARENT" ]; then
-    TMP="$(mktemp -dt ask)"
+    TMP="$(mktemp -dt ask.XXXXXXXX)"
     FIFO="$TMP/fifo"
     function cleanup { rm -fr "$TMP"; }
     trap cleanup EXIT
     mkfifo -m 0600 "$FIFO" || exit 1
-    which -s whiptail || exit 1
+    which whiptail >/dev/null || exit 1
     tmux new-window -n askpass "'$0' --prompt '$FIFO' --inputbox '$PROMPT' $INPUTOPTS" > /dev/null 2>&1
     if [ "$?" == "0" ]; then
         builtin read -t $TIMEOUT -rd '' GRACE REPLY < "$FIFO" || tmux kill-window -t askpass
@@ -106,6 +111,6 @@ fi
 if [ "$EXIT" -ne "0" ]; then
     notify "Denied use of ${KEYFILE:-agent}."
 elif [ "$GRACE" -gt 0 ]; then
-    date "-v+${GRACE}S" "+%s" > ~/.ssh/ssh-agent.timeout   
+    echo $(($(date +%s) + ${GRACE})) > ~/.ssh/ssh-agent.timeout   
 fi
 exit $EXIT
