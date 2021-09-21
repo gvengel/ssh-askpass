@@ -75,7 +75,7 @@ if [ "$PARENT" ]; then
   mkfifo -m 0600 "$FIFO" || exit 1
   which whiptail >/dev/null || exit 1
   if tmux new-window -n askpass "'$0' --prompt '$FIFO' --inputbox '$PROMPT' $INPUTOPTS" >/dev/null 2>&1; then
-    builtin read -t $TIMEOUT -rd '' GRACE REPLY <"$FIFO" || tmux kill-window -t askpass
+    builtin read -t $TIMEOUT -rd '' GRACE REPLY <"$FIFO" || tmux kill-window -t askpass 2>/dev/null
     if [ "$REPLY" == "0" ]; then
       EXIT=0
     fi
